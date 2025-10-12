@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Study Discussion Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background-color: #fff;
+      }
+      input {
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        width: 100%;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #007aff;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+        width: 100%;
+        text-align: center;
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .exam-box,
+      .menu-btn {
+        padding: 15px;
+        border-radius: 10px;
+        margin: 8px;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        background-color: #fff;
+      }
+      .feature-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: left;
+        width: 90%;
+        max-width: 420px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+      .notice-box {
+        background: #fff7e6;
+        border: 1px solid #ffb347;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 15px;
+        width: 90%;
+        max-width: 420px;
+      }
+      .frame {
+        background: #fff;
+        border-radius: 10px;
+        margin: 10px;
+        padding: 8px;
+        box-shadow: 0 0 4px rgba(0, 0, 0, 0.1);
+      }
+      img {
+        width: 100%;
+        border-radius: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      function App() {
+        const [screen, setScreen] = useState("welcome");
+        const [signupData, setSignupData] = useState({
+          username: "",
+          email: "",
+          password: "",
+          mobile: "",
+          pin: "",
+        });
+        const [loginData, setLoginData] = useState({
+          username: "",
+          email: "",
+          password: "",
+          mobile: "",
+          pin: "",
+        });
+        const [selectedExam, setSelectedExam] = useState(null);
+        const [paymentStatus, setPaymentStatus] = useState("pending");
+
+        // --------------- WELCOME ----------------
+        if (screen === "welcome") {
+          return (
+            <div className="container" style={{ backgroundColor: "#90EE90" }}>
+              <img
+                src="https://i.postimg.cc/Pf08JGn1/Screenshot-2025-10-05-17-33-28-667-edit-com-miui-gallery.jpg"
+                alt="logo"
+                style={{
+                  width: 120,
+                  height: 120,
+                  borderRadius: 60,
+                  marginBottom: 20,
+                }}
+              />
+              <h2>Welcome to Study Discussion Club</h2>
+              <p>This App is Developed by Sajan</p>
+              <button onClick={() => setScreen("signup")}>Next</button>
+            </div>
+          );
+        }
+
+        // --------------- SIGNUP ----------------
+        if (screen === "signup") {
+          const isFormFilled = Object.values(signupData).every(
+            (v) => v.trim() !== ""
+          );
+          return (
+            <div className="container" style={{ backgroundColor: "#89CFF0" }}>
+              <h2>Signup</h2>
+              {Object.keys(signupData).map((key) => (
+                <input
+                  key={key}
+                  placeholder={key.charAt(0).toUpperCase() + key.slice(1)}
+                  type={key === "password" || key === "pin" ? "password" : "text"}
+                  value={signupData[key]}
+                  onChange={(e) =>
+                    setSignupData({ ...signupData, [key]: e.target.value })
+                  }
+                />
+              ))}
+              <button
+                style={{
+                  backgroundColor: isFormFilled ? "#007AFF" : "gray",
+                  cursor: isFormFilled ? "pointer" : "not-allowed",
+                }}
+                onClick={() => isFormFilled && setScreen("examlist")}
+              >
+                Signup
+              </button>
+              <p
+                style={{ color: "#007AFF", cursor: "pointer" }}
+                onClick={() => setScreen("login")}
+              >
+                Already have an account?
+              </p>
+            </div>
+          );
+        }
+
+        // --------------- LOGIN ----------------
+        if (screen === "login") {
+          return (
+            <div className="container" style={{ backgroundColor: "#D3D3D3" }}>
+              <p
+                style={{ cursor: "pointer", fontSize: 18 }}
+                onClick={() => setScreen("signup")}
+              >
+                🔙 Back
+              </p>
+              <h2>Login</h2>
+              {Object.keys(loginData).map((key) => (
+                <input
+                  key={key}
+                  placeholder={key.charAt(0).toUpperCase() + key.slice(1)}
+                  type={key === "password" || key === "pin" ? "password" : "text"}
+                  value={loginData[key]}
+                  onChange={(e) =>
+                    setLoginData({ ...loginData, [key]: e.target.value })
+                  }
+                />
+              ))}
+              <button onClick={() => setScreen("examlist")}>Login</button>
+            </div>
+          );
+        }
+
+        // --------------- EXAM LIST ----------------
+        if (screen === "examlist") {
+          const exams = [
+            "UPSC",
+            "NEET",
+            "JEE",
+            "JUDICIARY",
+            "NDA",
+            "BOARD EXAM",
+            "MATRIC CLASSES",
+          ];
+          return (
+            <div className="container" style={{ backgroundColor: "#FF7F7F" }}>
+              <h2>Select Your Exam</h2>
+              {exams.map((exam) => (
+                <div
+                  key={exam}
+                  className="exam-box"
+                  style={{
+                    backgroundColor:
+                      selectedExam === exam ? "#FF4500" : "#fff",
+                  }}
+                  onClick={() => setSelectedExam(exam)}
+                >
+                  {exam}
+                </div>
+              ))}
+              <button
+                style={{
+                  backgroundColor: selectedExam ? "#007AFF" : "gray",
+                  cursor: selectedExam ? "pointer" : "not-allowed",
+                }}
+                onClick={() => selectedExam && setScreen("payment")}
+              >
+                Next
+              </button>
+            </div>
+          );
+        }
+
+        // --------------- PAYMENT SCREEN ----------------
+        if (screen === "payment") {
+          useEffect(() => {
+            const timer = setTimeout(() => {
+              if (paymentStatus === "pending") setPaymentStatus("manual");
+            }, 180000); // 3 minutes
+            return () => clearTimeout(timer);
+          }, [paymentStatus]);
+
+          return (
+            <div className="container" style={{ backgroundColor: "#FFF8DC" }}>
+              <h2>Subscription</h2>
+              <h3>{selectedExam}</h3>
+              <div className="feature-box">
+                <p>• Daily Current Affairs</p>
+                <p>• Daily Practice Questions</p>
+                <p>• Mind Maps and Book Summaries</p>
+                <p>• Discussion and Contest Entry Fee Included</p>
+              </div>
+              <button
+                onClick={() => {
+                  setPaymentStatus("success");
+                  setTimeout(() => setScreen("home"), 2000);
+                }}
+              >
+                Pay Now
+              </button>
+
+              {paymentStatus === "manual" && (
+                <div className="notice-box">
+                  <p>
+                    Our team will manually verify your payment within 8 to 12
+                    hours. Once verified, your subscription will be activated.
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        // --------------- HOME SCREEN ----------------
+        if (screen === "home") {
+          const menu = [
+            "📌 Current Affairs",
+            "📝 Practice Questions",
+            "🧠 Mind Maps",
+            "📚 UPSC Books Summary",
+            "🎤 Interview Practice Questions",
+            "💬 Discussion",
+            "🎥 Live Classes",
+            "🏦 Donation Bank",
+            "📖 English Vocabulary",
+          ];
+          const bgColors = [
+            "#FFFACD",
+            "#B0E0E6",
+            "#D3D3D3",
+            "#2E8B57",
+            "#ADD8E6",
+            "#F5DEB3",
+            "#FFA500",
+            "#A0522D",
+            "#8B4513",
+          ];
+          return (
+            <div className="container" style={{ backgroundColor: "#FFFFE0" }}>
+              <h2>Study Discussion Club</h2>
+              {menu.map((item, index) => (
+                <div
+                  key={item}
+                  className="menu-btn"
+                  style={{ backgroundColor: bgColors[index] }}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        return null;
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
