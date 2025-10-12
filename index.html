@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Study Discussion Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+      input {
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        width: 100%;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #007aff;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+        width: 100%;
+        text-align: center;
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .exam-box,
+      .menu-btn {
+        padding: 15px;
+        border-radius: 10px;
+        margin: 8px;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        background-color: #fff;
+      }
+      .feature-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: left;
+        width: 90%;
+        max-width: 420px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+      .notice-box {
+        background: #fff7e6;
+        border: 1px solid #ffb347;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 15px;
+        width: 90%;
+        max-width: 420px;
+      }
+      .image-frame {
+        background: white;
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        width: 90%;
+        max-width: 400px;
+      }
+      .image-frame img {
+        width: 100%;
+        border-radius: 10px;
+      }
+      .back-btn {
+        color: #007aff;
+        cursor: pointer;
+        font-weight: bold;
+        align-self: flex-start;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useState, useEffect } = React;
+
+      function App() {
+        const [screen, setScreen] = useState("welcome");
+        const [selectedExam, setSelectedExam] = useState(null);
+        const [manualNotice, setManualNotice] = useState(false);
+        const [paymentStatus, setPaymentStatus] = useState("pending");
+
+        const imageLinks = {
+          "Current Affairs": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/current1.jpg",
+            "https://raw.githubusercontent.com/demo/demo-repo/main/current2.jpg",
+          ],
+          "Practice Questions": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/practice1.jpg",
+            "https://raw.githubusercontent.com/demo/demo-repo/main/practice2.jpg",
+          ],
+          "Mind Maps": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/mind1.jpg",
+          ],
+          "UPSC Books Summary": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/book1.jpg",
+          ],
+          "Interview Practice Questions": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/interview1.jpg",
+          ],
+          "Discussion": [],
+          "Live Classes": [],
+          "Donation Bank": [],
+          "English Vocabulary": [
+            "https://raw.githubusercontent.com/demo/demo-repo/main/vocab1.jpg",
+          ],
+        };
+
+        useEffect(() => {
+          if (screen === "payment" && paymentStatus === "pending") {
+            const timer = setTimeout(() => setManualNotice(true), 180000);
+            return () => clearTimeout(timer);
+          }
+        }, [screen, paymentStatus]);
+
+        // ------------ WELCOME SCREEN ------------
+        if (screen === "welcome")
+          return (
+            <div className="container" style={{ backgroundColor: "#90EE90" }}>
+              <h2>Welcome to Study Discussion Club</h2>
+              <p>Developed by Sajan</p>
+              <button onClick={() => setScreen("examlist")}>Start</button>
+            </div>
+          );
+
+        // ------------ EXAM LIST ------------
+        if (screen === "examlist") {
+          const exams = ["UPSC", "NEET", "JEE", "NDA", "JUDICIARY"];
+          return (
+            <div className="container" style={{ backgroundColor: "#FF7F7F" }}>
+              <h2>Select Exam</h2>
+              {exams.map((exam) => (
+                <div
+                  key={exam}
+                  className="exam-box"
+                  onClick={() => setSelectedExam(exam)}
+                  style={{
+                    backgroundColor:
+                      selectedExam === exam ? "#FF4500" : "#fff",
+                  }}
+                >
+                  {exam}
+                </div>
+              ))}
+              <button
+                disabled={!selectedExam}
+                style={{
+                  backgroundColor: selectedExam ? "#007AFF" : "gray",
+                  cursor: selectedExam ? "pointer" : "not-allowed",
+                }}
+                onClick={() => setScreen("payment")}
+              >
+                Next
+              </button>
+            </div>
+          );
+        }
+
+        // ------------ PAYMENT SCREEN ------------
+        if (screen === "payment")
+          return (
+            <div className="container" style={{ backgroundColor: "#FFF8DC" }}>
+              <h2>Subscription</h2>
+              <h3>{selectedExam}</h3>
+              <div className="feature-box">
+                <p>• Daily Current Affairs</p>
+                <p>• Daily Practice Questions</p>
+                <p>• Mind Maps & Books Summary</p>
+                <p>• Discussion & Contest Entry</p>
+              </div>
+              <button
+                onClick={() => {
+                  setPaymentStatus("success");
+                  setTimeout(() => setScreen("home"), 1500);
+                }}
+              >
+                Pay Now
+              </button>
+              {manualNotice && (
+                <div className="notice-box">
+                  Our team will manually verify your payment soon.
+                </div>
+              )}
+            </div>
+          );
+
+        // ------------ HOME SCREEN ------------
+        if (screen === "home") {
+          const menu = [
+            "Current Affairs",
+            "Practice Questions",
+            "Mind Maps",
+            "UPSC Books Summary",
+            "Interview Practice Questions",
+            "Discussion",
+            "Live Classes",
+            "Donation Bank",
+            "English Vocabulary",
+          ];
+          const colors = [
+            "#FFFACD",
+            "#B0E0E6",
+            "#D3D3D3",
+            "#2E8B57",
+            "#ADD8E6",
+            "#F5DEB3",
+            "#FFA500",
+            "#A0522D",
+            "#8B4513",
+          ];
+
+          return (
+            <div className="container" style={{ backgroundColor: "#FFFFE0" }}>
+              <h2>Study Discussion Club</h2>
+              {menu.map((item, i) => (
+                <div
+                  key={item}
+                  className="menu-btn"
+                  style={{ backgroundColor: colors[i], color: "black" }}
+                  onClick={() => setScreen(item)}
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        // ------------ IMAGE SCREENS ------------
+        const bgColors = {
+          "Current Affairs": "#E6E6FA",
+          "Practice Questions": "#B0E0E6",
+          "Mind Maps": "#A9A9A9",
+          "UPSC Books Summary": "#006400",
+          "Interview Practice Questions": "#ADD8E6",
+          Discussion: "#DEB887",
+          "Live Classes": "#FFA500",
+          "Donation Bank": "#A0522D",
+          "English Vocabulary": "#8B4513",
+        };
+
+        const imgs = imageLinks[screen] || [];
+        return (
+          <div
+            className="container"
+            style={{ backgroundColor: bgColors[screen] || "#fff" }}
+          >
+            <div className="back-btn" onClick={() => setScreen("home")}>
+              ← Back
+            </div>
+            <h2>{screen}</h2>
+
+            {imgs.length > 0 ? (
+              imgs.map((link, idx) => (
+                <div key={idx} className="image-frame">
+                  <img src={link} alt={`${screen} ${idx}`} />
+                </div>
+              ))
+            ) : (
+              <p>No content uploaded yet.</p>
+            )}
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
