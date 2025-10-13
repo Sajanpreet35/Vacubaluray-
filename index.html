@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Study Discussion Club</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- React + Babel -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Arial, sans-serif;
+      }
+      input {
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        width: 100%;
+        border: 1px solid #ccc;
+      }
+      button {
+        background-color: #007aff;
+        padding: 12px;
+        border-radius: 8px;
+        margin-top: 10px;
+        width: 100%;
+        text-align: center;
+        color: white;
+        font-weight: bold;
+        border: none;
+        cursor: pointer;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        min-height: 100vh;
+        text-align: center;
+      }
+      .exam-box,
+      .menu-btn {
+        padding: 15px;
+        border-radius: 10px;
+        margin: 8px;
+        width: 90%;
+        max-width: 400px;
+        border: 1px solid #ccc;
+        cursor: pointer;
+        background-color: #fff;
+      }
+      .feature-box {
+        background: #fff;
+        padding: 15px;
+        border-radius: 12px;
+        text-align: left;
+        width: 90%;
+        max-width: 420px;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+      }
+      .notice-box {
+        background: #fff7e6;
+        border: 1px solid #ffb347;
+        border-radius: 8px;
+        padding: 12px;
+        margin-top: 15px;
+        width: 90%;
+        max-width: 420px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      // ✅ Initialize Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyDwbIHTMWM_AQ-NlsdXGDzAfoC8Tf8lZiY",
+        authDomain: "study-discussion-club.firebaseapp.com",
+        projectId: "study-discussion-club",
+        storageBucket: "study-discussion-club.appspot.com",
+        messagingSenderId: "383378613377",
+        appId: "1:383378613377:web:3b932c6b42076352811980",
+        measurementId: "G-BGEBD4CXJ9",
+      };
+
+      const app = firebase.initializeApp(firebaseConfig);
+      const auth = firebase.auth();
+      const db = firebase.firestore();
+
+      const { useState } = React;
+
+      function App() {
+        const [screen, setScreen] = useState("welcome");
+        const [signupData, setSignupData] = useState({
+          username: "",
+          email: "",
+          password: "",
+          mobile: "",
+          pin: "",
+        });
+        const [loginData, setLoginData] = useState({
+          email: "",
+          password: "",
+        });
+        const [selectedExam, setSelectedExam] = useState(null);
+
+        // ✅ SIGNUP FUNCTION
+        const handleSignup = async () => {
+          try {
+            const { email, password, username, mobile, pin } = signupData;
+            if (!email || !password) {
+              alert("Please fill all details");
+              return;
+            }
+
+            const userCredential = await auth.createUserWithEmailAndPassword(
+              email,
+              password
+            );
+            const user = userCredential.user;
+
+            // Save user info in Firestore
+            await db.collection("users").doc(user.uid).set({
+              username,
+              email,
+              mobile,
+              pin,
+              createdAt: new Date().toISOString(),
+            });
+
+            alert("Signup successful ✅");
+            setScreen("examlist");
+          } catch (error) {
+            alert("Signup failed ❌ " + error.message);
+          }
+        };
+
+        // ✅ LOGIN FUNCTION
+        const handleLogin = async () => {
+          try {
+            const { email, password } = loginData;
+            const userCredential = await auth.signInWithEmailAndPassword(
+              email,
+              password
+            );
+            alert("Login successful ✅");
+            setScreen("examlist");
+          } catch (error) {
+            alert("Login failed ❌ " + error.message);
+          }
+        };
+
+        // ---------------- WELCOME ----------------
+        if (screen === "welcome") {
+          return (
+            <div className="container" style={{ backgroundColor: "#90EE90" }}>
+              <h2>Welcome to Study Discussion Club</h2>
+              <p>Developed by Sajan</p>
+              <button onClick={() => setScreen("signup")}>Next</button>
+            </div>
+          );
+        }
+
+        // ---------------- SIGNUP ----------------
+        if (screen === "signup") {
+          const isFormFilled = Object.values(signupData).every(
+            (v) => v.trim() !== ""
+          );
+          return (
+            <div className="container" style={{ backgroundColor: "#89CFF0" }}>
+              <h2>Signup</h2>
+              {Object.keys(signupData).map((key) => (
+                <input
+                  key={key}
+                  placeholder={
+                    key.charAt(0).toUpperCase() + key.slice(1)
+                  }
+                  type={
+                    key === "password" || key === "pin" ? "password" : "text"
+                  }
+                  value={signupData[key]}
+                  onChange={(e) =>
+                    setSignupData({ ...signupData, [key]: e.target.value })
+                  }
+                />
+              ))}
+              <button
+                style={{
+                  backgroundColor: isFormFilled ? "#007AFF" : "gray",
+                  cursor: isFormFilled ? "pointer" : "not-allowed",
+                }}
+                onClick={handleSignup}
+              >
+                Signup
+              </button>
+              <p
+                style={{ color: "#007AFF", cursor: "pointer" }}
+                onClick={() => setScreen("login")}
+              >
+                Already have an account?
+              </p>
+            </div>
+          );
+        }
+
+        // ---------------- LOGIN ----------------
+        if (screen === "login") {
+          return (
+            <div className="container" style={{ backgroundColor: "#D3D3D3" }}>
+              <h2>Login</h2>
+              <input
+                placeholder="Email"
+                value={loginData.email}
+                onChange={(e) =>
+                  setLoginData({ ...loginData, email: e.target.value })
+                }
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={loginData.password}
+                onChange={(e) =>
+                  setLoginData({ ...loginData, password: e.target.value })
+                }
+              />
+              <button onClick={handleLogin}>Login</button>
+            </div>
+          );
+        }
+
+        // ---------------- EXAM LIST ----------------
+        if (screen === "examlist") {
+          const exams = ["UPSC", "NEET", "JEE", "NDA", "JUDICIARY"];
+          return (
+            <div className="container" style={{ backgroundColor: "#FF7F7F" }}>
+              <h2>Select Exam</h2>
+              {exams.map((exam) => (
+                <div
+                  key={exam}
+                  className="exam-box"
+                  onClick={() => setSelectedExam(exam)}
+                  style={{
+                    backgroundColor:
+                      selectedExam === exam ? "#FF4500" : "#fff",
+                  }}
+                >
+                  {exam}
+                </div>
+              ))}
+              <button
+                disabled={!selectedExam}
+                style={{
+                  backgroundColor: selectedExam ? "#007AFF" : "gray",
+                  cursor: selectedExam ? "pointer" : "not-allowed",
+                }}
+                onClick={() => setScreen("home")}
+              >
+                Next
+              </button>
+            </div>
+          );
+        }
+
+        // ---------------- HOME SCREEN ----------------
+        if (screen === "home") {
+          const menu = [
+            "📌 Current Affairs",
+            "📝 Practice Questions",
+            "🧠 Mind Maps",
+            "📚 UPSC Books Summary",
+            "🎤 Interview Practice Questions",
+            "💬 Discussion",
+            "🎥 Live Classes",
+            "🏦 Donation Bank",
+            "📖 English Vocabulary",
+          ];
+          return (
+            <div className="container" style={{ backgroundColor: "#FFFFE0" }}>
+              <h2>Study Discussion Club</h2>
+              {menu.map((item) => (
+                <div key={item} className="menu-btn">
+                  {item}
+                </div>
+              ))}
+            </div>
+          );
+        }
+
+        return null;
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
