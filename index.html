@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Study Discussion Club</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <!-- React + Babel -->
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase UMD (compat) -->
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    :root{--maxW:420px}
+    body { margin:0; font-family: "Segoe UI", Arial, sans-serif; background:#fffde7; }
+    .container { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:20px; box-sizing:border-box; }
+    .card { width:100%; max-width:var(--maxW); background:#fff; border-radius:12px; padding:18px; box-shadow:0 6px 20px rgba(0,0,0,0.06); }
+    h1,h2,h3 { margin:6px 0 12px 0; font-weight:600; }
+    input, select, textarea { width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #d0d0d0; box-sizing:border-box; }
+    button { width:100%; padding:12px; border-radius:10px; border:none; background:#007aff; color:white; font-weight:700; cursor:pointer; }
+    button.secondary { background:#4caf50; }
+    .small { font-size:13px; color:#555; }
+    .box { background:#fff; border:1px solid #e6e6e6; border-radius:10px; padding:12px; margin:8px 0; }
+    .menu-item { padding:14px; border-radius:10px; margin:8px 0; background:#fff6cc; cursor:pointer; border:1px solid #f0e0a0; }
+    .image-frame { background:#fff; border-radius:10px; overflow:hidden; margin:10px 0; box-shadow:0 4px 12px rgba(0,0,0,0.08); }
+    .image-frame img { width:100%; display:block; }
+    .notice { background:#fff7e6; border:1px solid #ffb347; padding:12px; border-radius:8px; margin-top:12px; }
+    .muted { color:#666; font-size:13px; }
+    .row { display:flex; gap:10px; }
+    .col { flex:1; }
+    .linklike { color:#007aff; cursor:pointer; font-weight:600; }
+    .center { text-align:center; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+  const { useState, useEffect } = React;
+
+  // -----------------------------
+  // CONFIG: change these if needed
+  // -----------------------------
+  const SHEETDB_URL = "https://sheetdb.io/api/v1/gt8vb3ysgkonl"; // provided by you
+  const PLAN_DAYS = 20; // subscription length
+  const UPI_ID = "demo@upi"; // demo UPI id (replace with real for production)
+  const AMOUNT = "49.00"; // demo amount to show in intent
+
+  // Firebase init (compat)
+  const firebaseConfig = {
+    apiKey: "AIzaSyDwbIHTMWM_AQ-NlsdXGDzAfoC8Tf8lZiY",
+    authDomain: "study-discussion-club.firebaseapp.com",
+    projectId: "study-discussion-club",
+    storageBucket: "study-discussion-club.appspot.com",
+    messagingSenderId: "383378613377",
+    appId: "1:383378613377:web:3b932c6b42076352811980"
+  };
+  if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  // Utility: format date
+  function formatDateISO(d) {
+    if(!d) return "";
+    const dt = new Date(d);
+    return dt.toISOString().split("T")[0];
+  }
+  function formatReadable(d) {
+    if(!d) return "";
+    return new Date(d).toDateString();
+  }
+
+  function App(){
+    const [screen, setScreen] = useState("welcome"); // welcome, signup, login, exam, payment, manual, home, content
+    const [user, setUser] = useState(null);
+    const [signup, setSignup] = useState({username:"", email:"", password:"", mobile:"", pin:""});
+    const [login, setLogin] = useState({email:"", password:""});
+    const [selectedExam, setSelectedExam] = useState(null);
+
+    // payment flow states
+    const [waitingReturn, setWaitingReturn] = useState(false); // after opening UPI intent
+    const [manualVisible, setManualVisible] = useState(false); // after 2min
+    const [manualForm, setManualForm] = useState({name:"", mobile:"", upi:""});
+    const [codeInput, setCodeInput] = useState("");
+    const [subscription, setSubscription] = useState(null); // {startISO, expiryISO}
+    const [contentScreen, setContentScreen] = useState(null);
+
+    // demo images (you can replace with your github raw image links)
+    const contentImages = {
+      "Current Affairs": ["https://i.imgur.com/UhPzHM1.jpeg"],
+      "Practice Questions": ["https://i.imgur.com/UhPzHM1.jpeg"],
+      "Mind Maps": ["https://i.imgur.com/UhPzHM1.jpeg"],
+      "UPSC Books Summary": ["https://i.imgur.com/UhPzHM1.jpeg"],
+      "Interview Practice Questions": ["https://i.imgur.com/UhPzHM1.jpeg"]
+    };
+
+    useEffect(()=>{
+      // Firebase auth listener
+      const unsub = auth.onAuthStateChanged(u=>{
+        setUser(u);
+        // If user logged in and has subscription in Firestore, fetch it
+        if(u){
+          db.collection("subscriptions").doc(u.uid).get().then(doc=>{
+            if(doc.exists){
+              setSubscription(doc.data());
+            }
+          }).catch(()=>{});
+        }
+      });
+      return ()=>unsub();
+    },[]);
+
+    // When payment screen shown, start 2 min timer for manual fallback
+    useEffect(()=>{
+      let t;
+      if(screen === "payment" && waitingReturn === false && manualVisible === false){
+        t = setTimeout(()=>{
+          setManualVisible(true);
+        }, 120000); // 2 minutes
+      }
+      return ()=>{ if(t) clearTimeout(t); };
+    }, [screen, waitingReturn, manualVisible]);
+
+    // Signup
+    async function doSignup(){
+      if(!signup.email || !signup.password){ alert("Please enter email & password"); return; }
+      try{
+        const res = await auth.createUserWithEmailAndPassword(signup.email, signup.password);
+        const uid = res.user.uid;
+        await db.collection("users").doc(uid).set({username: signup.username, email: signup.email, mobile: signup.mobile, pin: signup.pin, createdAt: new Date().toISOString()});
+        alert("Signup successful");
+        setScreen("exam");
+      }catch(err){ alert("Signup error: "+err.message); }
+    }
+
+    // Login
+    async function doLogin(){
+      if(!login.email || !login.password){ alert("Please enter email & password"); return; }
+      try{
+        await auth.signInWithEmailAndPassword(login.email, login.password);
+        alert("Login successful");
+        setScreen("exam");
+      }catch(err){ alert("Login error: "+err.message); }
+    }
+
+    // Build UPI intent URL
+    function buildUpiUrl() {
+      // tr=txnRef helps when you want to match transaction later
+      const txnRef = "SDC"+Date.now();
+      const tn = encodeURIComponent("Study Discussion Club subscription");
+      const pa = encodeURIComponent(UPI_ID);
+      const pn = encodeURIComponent("Study Discussion Club");
+      const am = encodeURIComponent(AMOUNT);
+      // Basic UPI URI
+      return `upi://pay?pa=${pa}&pn=${pn}&am=${am}&cu=INR&tn=${tn}&tr=${txnRef}`;
+    }
+
+    // Open UPI intent
+    function payNow() {
+      // open UPI app via URI
+      const upiUrl = buildUpiUrl();
+      // Mark waiting & show instructions
+      setWaitingReturn(true);
+      setManualVisible(false);
+      // Open intent
+      window.location.href = upiUrl;
+      // For web, user will go to UPI app. When they return, they should press "Verify Payment".
+      // Start a 2-minute fallback handled by effect above.
+    }
+
+    // Verified by user clicking "I have paid" / verify
+    async function verifyPaymentByUser() {
+      // In web we cannot be 100% sure without gateway; so we accept user verification as success here.
+      // Save subscription to Firestore + SheetDB
+      const start = new Date();
+      const expiry = new Date(start.getTime() + PLAN_DAYS*24*60*60*1000);
+      const sub = { startISO: start.toISOString(), expiryISO: expiry.toISOString() };
+      setSubscription(sub);
+      // Save in Firestore if logged in
+      try {
+        if(user) {
+          await db.collection("subscriptions").doc(user.uid).set(sub);
+        }
+      } catch (e) { console.warn("Firestore save failed", e); }
+      // Save to SheetDB for records
+      try {
+        const payload = {
+          data: [
+            {
+              user_email: user ? user.email : "",
+              exam: selectedExam || "",
+              payment_method: "UPI-manual-verified",
+              payment_status: "success",
+              subscription_start: sub.startISO,
+              subscription_expiry: sub.expiryISO,
+              timestamp: new Date().toISOString()
+            }
+          ]
+        };
+        await fetch(SHEETDB_URL, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+      } catch(e){ console.warn("SheetDB save fail", e); }
+      alert("Payment verified and subscription activated. Expiry: "+formatReadable(sub.expiryISO));
+      setWaitingReturn(false);
+      setManualVisible(false);
+      setScreen("home");
+    }
+
+    // Manual verification submit (when user didn't get response from UPI)
+    async function submitManualVerification() {
+      if(!manualForm.name || !manualForm.mobile || !manualForm.upi){ alert("Please fill all fields"); return; }
+      const payload = {
+        data: [
+          {
+            user_email: user ? user.email : "",
+            name: manualForm.name,
+            mobile: manualForm.mobile,
+            upi: manualForm.upi,
+            exam: selectedExam || "",
+            payment_status: "pending_manual_verification",
+            timestamp: new Date().toISOString()
+          }
+        ]
+      };
+      try {
+        await fetch(SHEETDB_URL, { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(payload) });
+        alert("Submitted for manual verification. Our team will verify within 12 hours.");
+        // keep user on same screen or send to a 'waiting' home
+        setManualForm({name:"", mobile:"", upi:""});
+      } catch(e){
+        alert("Submission failed. Try again.");
+      }
+    }
+
+    // Code unlock
+    function applyCode() {
+      if(codeInput.trim().toUpperCase() === "BIGHIT") {
+        const start = new Date();
+        const expiry = new Date(start.getTime() + PLAN_DAYS*24*60*60*1000);
+        const sub = { startISO: start.toISOString(), expiryISO: expiry.toISOString() };
+        setSubscription(sub);
+        if(user) db.collection("subscriptions").doc(user.uid).set(sub).catch(()=>{});
+        alert("Code accepted — Subscription activated until "+formatReadable(sub.expiryISO));
+        setScreen("home");
+      } else {
+        alert("Invalid code");
+      }
+    }
+
+    // Logout
+    function doLogout() {
+      auth.signOut().catch(()=>{});
+      setUser(null);
+      setSubscription(null);
+      setScreen("welcome");
+    }
+
+    // ---------------- SCREENS ----------------
+
+    // Welcome
+    if(screen === "welcome") {
+      return (
+        <div className="container">
+          <div className="card center">
+            <h1>Study Discussion Club</h1>
+            <p className="muted">Mobile-first learning & discussions</p>
+            <button onClick={()=>setScreen("signup")}>Get Started</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Signup
+    if(screen === "signup") {
+      return (
+        <div className="container">
+          <div className="card">
+            <h2>Create account</h2>
+            <input placeholder="Username" value={signup.username} onChange={e=>setSignup({...signup, username:e.target.value})} />
+            <input placeholder="Email" value={signup.email} onChange={e=>setSignup({...signup, email:e.target.value})} />
+            <input type="password" placeholder="Password" value={signup.password} onChange={e=>setSignup({...signup, password:e.target.value})} />
+            <input placeholder="Mobile" value={signup.mobile} onChange={e=>setSignup({...signup, mobile:e.target.value})} />
+            <input type="password" placeholder="4-digit PIN" value={signup.pin} onChange={e=>setSignup({...signup, pin:e.target.value})} />
+            <button onClick={doSignup}>Sign up</button>
+            <p className="small">Already have an account? <span className="linklike" onClick={()=>setScreen("login")}>Login</span></p>
+          </div>
+        </div>
+      );
+    }
+
+    // Login
+    if(screen === "login") {
+      return (
+        <div className="container">
+          <div className="card">
+            <h2>Login</h2>
+            <input placeholder="Email" value={login.email} onChange={e=>setLogin({...login, email:e.target.value})} />
+            <input type="password" placeholder="Password" value={login.password} onChange={e=>setLogin({...login, password:e.target.value})} />
+            <button onClick={doLogin}>Login</button>
+            <p className="small">New user? <span className="linklike" onClick={()=>setScreen("signup")}>Create account</span></p>
+          </div>
+        </div>
+      );
+    }
+
+    // Exam select
+    if(screen === "exam") {
+      const exams = ["UPSC","NEET","JEE","NDA","JUDICIARY"];
+      return (
+        <div className="container">
+          <div className="card">
+            <h2>Select Exam</h2>
+            {exams.map(e => (
+              <div key={e} className="menu-item" onClick={()=>setSelectedExam(e)} style={{background: selectedExam===e ? "#ffe6d5" : undefined}}>
+                {e}
+              </div>
+            ))}
+            <div style={{marginTop:10}}>
+              <button disabled={!selectedExam} onClick={()=>setScreen("payment")} style={{opacity: selectedExam ? 1 : 0.6}}>Proceed to Payment</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Payment screen
+    if(screen === "payment") {
+      return (
+        <div className="container">
+          <div className="card">
+            <h2>Subscription</h2>
+            <h3 className="small">Selected exam: <strong>{selectedExam}</strong></h3>
+
+            <div className="box">
+              <p className="small">Features included:</p>
+              <ul style={{textAlign:"left"}}>
+                <li>Daily Current Affairs</li>
+                <li>Daily Practice Questions</li>
+                <li>Mind Maps & UPSC Books Summary</li>
+                <li>Discussion & Contest Entry</li>
+              </ul>
+            </div>
+
+            <div style={{marginTop:8}}>
+              <button onClick={payNow}>Pay Now (Open UPI app)</button>
+            </div>
+
+            <div style={{marginTop:12}} className="small muted center">
+              <p>If you complete payment in your UPI app, return to this screen and press <strong>"Verify Payment"</strong>.</p>
+            </div>
+
+            { waitingReturn && (
+              <div style={{marginTop:12}}>
+                <button className="secondary" onClick={verifyPaymentByUser}>I have paid — Verify Payment</button>
+              </div>
+            )}
+
+            {/* Code unlock box */}
+            <div className="box" style={{marginTop:14}}>
+              <p className="small"><strong>Have a code?</strong> Enter below to immediately unlock subscription.</p>
+              <input placeholder="Enter code (e.g. BIGHIT)" value={codeInput} onChange={e=>setCodeInput(e.target.value)} />
+              <button onClick={applyCode}>Apply Code</button>
+            </div>
+
+            {/* Manual verification form - shown after 2 minutes */}
+            { manualVisible && (
+              <div style={{marginTop:14}}>
+                <h3>Manual verification</h3>
+                <div className="box">
+                  <p className="small">If the payment response didn't arrive automatically, please provide the details below for our team to verify manually.</p>
+                  <input placeholder="Full name" value={manualForm.name} onChange={e=>setManualForm({...manualForm, name: e.target.value})} />
+                  <input placeholder="Mobile number" value={manualForm.mobile} onChange={e=>setManualForm({...manualForm, mobile: e.target.value})} />
+                  <input placeholder="Your UPI ID used for payment" value={manualForm.upi} onChange={e=>setManualForm({...manualForm, upi: e.target.value})} />
+                  <button onClick={submitManualVerification}>Submit for Manual Verification</button>
+                </div>
+
+                <div className="notice">
+                  Dear sir, our team will manually verify your payment and activate your plan. Verification may take up to 12 hours. You will be contacted on the provided mobile number once the plan is activated.
+                </div>
+              </div>
+            )}
+
+            <div style={{marginTop:12}}>
+              <p className="muted small">Amount will be shown in the UPI app. (Demo UPI ID: <strong>{UPI_ID}</strong>)</p>
+            </div>
+
+            <div style={{marginTop:12}}>
+              <button onClick={()=>setScreen("exam")}>Back</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Home screen
+    if(screen === "home") {
+      const menu = ["Current Affairs","Practice Questions","Entry Fee / Contest","Mind Maps","UPSC Books Summary","Interview Practice Questions","Hidden Topics","Discussion","Live Classes","Donation Bank","SDC News"];
+      return (
+        <div className="container">
+          <div className="card">
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center"}}>
+              <h2>Study Discussion Club</h2>
+              <div style={{textAlign:"right"}}>
+                { user ? <div className="small">Hi, {user.email}<div style={{marginTop:6}}><span className="linklike" onClick={doLogout}>Logout</span></div></div> : <div className="small"><span className="linklike" onClick={()=>setScreen("login")}>Login</span></div>}
+              </div>
+            </div>
+
+            <div style={{marginTop:10}}>
+              <div className="box small">
+                <strong>Subscription expiry:</strong> { subscription ? formatReadable(subscription.expiryISO) : <span className="muted">No active subscription</span> }
+              </div>
+
+              {menu.map((m,i)=>(
+                <div key={m} className="menu-item" onClick={()=>{ if(contentImages[m]) setContentScreen(m); else alert("Content not uploaded yet"); }}>
+                  {m}
+                </div>
+              ))}
+
+              <div style={{marginTop:10}}>
+                <p className="small muted">All content opens in its screen. Click any box to view.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Content screens (images)
+    if(contentScreen) {
+      const imgs = contentImages[contentScreen] || [];
+      return (
+        <div className="container">
+          <div className="card">
+            <div style={{display:"flex", alignItems:"center", marginBottom:8}}>
+              <div style={{flex:1}}>
+                <h2>{contentScreen}</h2>
+              </div>
+              <div style={{textAlign:"right"}}><button onClick={()=>setContentScreen(null)}>Back</button></div>
+            </div>
+
+            { imgs.length > 0 ? imgs.map((url,idx)=>(
+              <div key={idx} className="image-frame"><img src={url} alt={contentScreen + idx} /></div>
+            )) : <p>No content uploaded yet.</p> }
+          </div>
+        </div>
+      );
+    }
+
+    // fallback
+    return (
+      <div className="container">
+        <div className="card center">
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  } // App
+
+  ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
